@@ -1,5 +1,5 @@
 # saiyan-finder
-Finds a file at super saiyan speedm, or not.
+Finds a file at super saiyan speed, or not.
 
 # Install
 ```bash
@@ -13,7 +13,7 @@ $ go build
 
 # Running
 ```bash
-./saiyan-finder wheremyfileat
+$ ./saiyan-finder wheremyfileat
 ```
 
 # Benchmarks
