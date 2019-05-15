@@ -9,6 +9,11 @@ import (
 	"sync"
 )
 
+type file struct {
+	name string
+	path string
+}
+
 type commit struct {
 	sync.Mutex
 	files []string
@@ -34,13 +39,19 @@ func readDir(dirname string) ([]os.FileInfo, error) {
 }
 
 func main() {
+	if len(os.Args) != 2 {
+		fmt.Println("saiyan-finder.exe [search term]")
+		os.Exit(0)
+	}
+	searchTerm := os.Args[1]
+
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
 	}
 	// fmt.Println("Current working directory:", cwd)
 
-	addFilePath := make(chan string)
+	addFile := make(chan *file)
 	addDirPath := make(chan string)
 	done := make(chan bool)
 
@@ -74,11 +85,12 @@ func main() {
 
 					files, err := readDir(dir)
 					if err != nil {
-						log.Fatal(err)
+						fmt.Println(err)
 					}
-					fmt.Println("Working in:", dir)
-					for _, file := range files {
-						path := filepath.FromSlash(fmt.Sprintf("%s/%s", dir, file.Name()))
+					//fmt.Println("Working in:", dir)
+					for _, f := range files {
+						name := f.Name()
+						path := filepath.FromSlash(fmt.Sprintf("%s/%s", dir, name))
 						stat, err := os.Stat(path)
 						if err != nil {
 							fmt.Println(err)
@@ -88,7 +100,7 @@ func main() {
 						case mode.IsDir():
 							addDirPath <- path
 						case mode.IsRegular():
-							addFilePath <- path
+							addFile <- &file{name: name, path: path}
 						}
 					}
 				}()
@@ -97,23 +109,29 @@ func main() {
 		}
 	}()
 
+	fileIndexed := 0
+
 	interrupt := make(chan os.Signal, 1)
 	signal.Notify(interrupt, os.Interrupt)
 	for {
 		select {
 		case dirPath := <-addDirPath:
 			dirs.queue = append(dirs.queue, dirPath)
-		case filePath := <-addFilePath:
-			commit.files = append(commit.files, filePath)
+		case file := <-addFile:
+			fileIndexed++
+			commit.files = append(commit.files, file.path)
+			if file.name == searchTerm {
+				fmt.Println(file.path)
+			}
+			//fmt.Println(file.name, file.path)
+
 		case <-interrupt:
 			fmt.Println("Interrupt detected. Exiting program.")
-			fmt.Println("Number of files indexed:", len(commit.files))
+			fmt.Println("Number of files indexed:", fileIndexed)
 			os.Exit(1)
 			return
 		case <-done:
-			// fmt.Println("commit.files:", commit.files)
-			// fmt.Println("working.queue:", dirs.queue)
-			fmt.Println("Number of files indexed:", len(commit.files))
+			fmt.Println("Number of files indexed:", fileIndexed)
 			os.Exit(0)
 			return
 		}
