@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -38,6 +39,7 @@ func readDir(dirname string) ([]os.FileInfo, error) {
 	return list, nil
 }
 
+// saiyan-finder is a command-line program that finds a file by its name.
 func main() {
 	if len(os.Args) != 2 {
 		fmt.Println("saiyan-finder.exe [search term]")
@@ -55,10 +57,15 @@ func main() {
 	addDirPath := make(chan string)
 	done := make(chan bool)
 
-	commit := commit{}
+	// If there's anything to be done with the indexed files, use the commit structure
+	//commit := commit{}
 	dirs := dirs{}
 	dirs.queue = append(dirs.queue, cwd)
 
+	// Given a directory, keep scanning subdirectories until there are no more.
+	// We scan a directory then spawn x number of goroutines. Then we wait for
+	// all of the current goroutines to finish. Then spawn again for the subdirectories
+	// that are in dirs.queue.
 	var wg sync.WaitGroup
 	go func() {
 		for {
@@ -72,16 +79,6 @@ func main() {
 				dir, dirs.queue = dirs.queue[0], dirs.queue[1:]
 				go func() {
 					defer wg.Done()
-					//var dir string
-					//dirs.Lock()
-					//if len(dirs.queue) > 0 {
-					//	dir, dirs.queue = dirs.queue[0], dirs.queue[1:]
-					//}
-					//dirs.Unlock()
-
-					//if len(dir) <= 0 {
-					//	return
-					//}
 
 					files, err := readDir(dir)
 					if err != nil {
@@ -119,12 +116,10 @@ func main() {
 			dirs.queue = append(dirs.queue, dirPath)
 		case file := <-addFile:
 			fileIndexed++
-			commit.files = append(commit.files, file.path)
-			if file.name == searchTerm {
+			//commit.files = append(commit.files, file.path)
+			if strings.Contains(file.name, searchTerm) {
 				fmt.Println(file.path)
 			}
-			//fmt.Println(file.name, file.path)
-
 		case <-interrupt:
 			fmt.Println("Interrupt detected. Exiting program.")
 			fmt.Println("Number of files indexed:", fileIndexed)
